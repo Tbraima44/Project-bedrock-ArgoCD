@@ -134,3 +134,4 @@ resource "helm_release" "argocd" {
 
   depends_on = [aws_eks_node_group.main]
 }
+#trigger
