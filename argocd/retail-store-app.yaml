@@ -1,0 +1,187 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: retail-store-carts
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    targetRevision: main
+    path: retail-store-app-charts/cart/chart
+    helm:
+      valueFiles:
+        - ../../../kubernetes/helm/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: retail-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: retail-store-catalog
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    targetRevision: main
+    path: retail-store-app-charts/catalog/chart
+    helm:
+      valueFiles:
+        - ../../../kubernetes/helm/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: retail-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: retail-store-orders
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    targetRevision: main
+    path: retail-store-app-charts/orders/chart
+    helm:
+      valueFiles:
+        - ../../../kubernetes/helm/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: retail-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: retail-store-checkout
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    targetRevision: main
+    path: retail-store-app-charts/checkout/chart
+    helm:
+      valueFiles:
+        - ../../../kubernetes/helm/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: retail-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: retail-store-ui
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    targetRevision: main
+    path: retail-store-app-charts/ui/chart
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: retail-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: retail-store-rabbitmq
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    targetRevision: main
+    path: kubernetes/retail-store
+    directory:
+      include: 'rabbitmq.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: retail-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: retail-store-redis
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    targetRevision: main
+    path: kubernetes/retail-store
+    directory:
+      include: 'redis.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: retail-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: retail-store-ingress
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    targetRevision: main
+    path: kubernetes/retail-store
+    directory:
+      include: 'ingress.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: retail-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
