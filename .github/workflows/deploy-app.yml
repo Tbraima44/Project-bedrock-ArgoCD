@@ -1,4 +1,4 @@
-name: Deploy Application
+name: Deploy Infrastructure
 
 on:
   workflow_run:
@@ -16,29 +16,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      
       - uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+      
       - uses: azure/setup-kubectl@v3
         with:
           version: 'latest'
-      - name: Setup LB Controller & CloudWatch
+      
+      - name: Run infrastructure setup
         run: |
-          aws eks update-kubeconfig --region $AWS_REGION --name project-bedrock-cluster
-          
-          # LB Controller (only if not running)
-          if ! kubectl get deployment aws-load-balancer-controller -n kube-system &>/dev/null; then
-            echo "Installing LB Controller..."
-            VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=project-bedrock-vpc" --query 'Vpcs[0].VpcId' --output text --region $AWS_REGION)
-            sed "s/--aws-vpc-id=.*/--aws-vpc-id=$VPC_ID/" kubernetes/infrastructure/lb-controller/deployment.yaml | kubectl apply -f -
-            kubectl wait --for=condition=available --timeout=120s deployment/aws-load-balancer-controller -n kube-system
-          fi
-          
-          # CloudWatch add-on
-          aws eks create-addon --cluster-name project-bedrock-cluster --addon-name amazon-cloudwatch-observability --region $AWS_REGION 2>/dev/null || true
-          
-          # Update Lambda
-          cd lambda/bedrock-asset-processor && zip -r ../bedrock-asset-processor.zip index.py && cd ../..
-          aws lambda update-function-code --function-name bedrock-asset-processor --zip-file fileb://lambda/bedrock-asset-processor.zip --region $AWS_REGION --no-cli-pager
+          chmod +x scripts/deploy-app.sh
+          ./scripts/deploy-app.sh
+      
+      - name: Output ALB URL
+        run: |
+          ALB_URL=$(kubectl get ingress retail-store-ingress -n retail-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Pending")
+          echo "Application URL: http://$ALB_URL"
