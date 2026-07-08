@@ -42,7 +42,7 @@ kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -
 # 5. Apply IngressClass from Git (ArgoCD managed)
 # ------------------------------------------------------------------
 echo "🌐 Applying IngressClass..."
-kubectl apply -f kubernetes/retail-store/ingressclass.yaml
+kubectl apply -f kubernetes/retail-store/ingress/ingressclass.yaml
 
 # ------------------------------------------------------------------
 # 6. Install AWS Load Balancer Controller
