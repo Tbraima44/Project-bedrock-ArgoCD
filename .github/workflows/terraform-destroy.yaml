@@ -1,0 +1,152 @@
+name: Terraform Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm infrastructure teardown'
+        required: true
+        default: ''
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  terraform-destroy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm_destroy == 'DESTROY' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Pre-cleanup - Delete Target Groups
+        run: |
+          for tg in $(aws elbv2 describe-target-groups --region $AWS_REGION --query "TargetGroups[?contains(TargetGroupName, 'k8s-retailap')].TargetGroupArn" --output text 2>/dev/null); do
+            echo "Deleting target group: $tg"
+            aws elbv2 delete-target-group --target-group-arn "$tg" --region $AWS_REGION 2>/dev/null || true
+          done
+      
+      - name: Pre-cleanup - Delete ALBs
+        run: |
+          for alb in $(aws elbv2 describe-load-balancers --region $AWS_REGION --query "LoadBalancers[?contains(LoadBalancerName, 'k8s-retailap')].LoadBalancerArn" --output text 2>/dev/null); do
+            echo "Deleting ALB: $alb"
+            aws elbv2 delete-load-balancer --load-balancer-arn "$alb" --region $AWS_REGION 2>/dev/null || true
+          done
+      
+      - name: Pre-cleanup - Delete NAT Gateways
+        run: |
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=project-bedrock-vpc" --query 'Vpcs[0].VpcId' --output text --region $AWS_REGION 2>/dev/null || echo "")
+          if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
+            for ngw in $(aws ec2 describe-nat-gateways --region $AWS_REGION --filter "Name=vpc-id,Values=$VPC_ID" --query 'NatGateways[*].NatGatewayId' --output text 2>/dev/null); do
+              echo "Deleting NAT Gateway: $ngw"
+              aws ec2 delete-nat-gateway --nat-gateway-id "$ngw" --region $AWS_REGION 2>/dev/null || true
+            done
+            echo "Waiting for NAT Gateways to delete..."
+            sleep 120
+          fi
+      
+      - name: Pre-cleanup - Release Elastic IPs
+        run: |
+          for eip in $(aws ec2 describe-addresses --region $AWS_REGION --query 'Addresses[*].AllocationId' --output text 2>/dev/null); do
+            echo "Releasing EIP: $eip"
+            aws ec2 release-address --allocation-id "$eip" --region $AWS_REGION 2>/dev/null || true
+          done
+      
+      - name: Pre-cleanup - Delete Network Interfaces
+        run: |
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=project-bedrock-vpc" --query 'Vpcs[0].VpcId' --output text --region $AWS_REGION 2>/dev/null || echo "")
+          if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
+            for eni in $(aws ec2 describe-network-interfaces --region $AWS_REGION --filters "Name=vpc-id,Values=$VPC_ID" --query 'NetworkInterfaces[*].NetworkInterfaceId' --output text 2>/dev/null); do
+              echo "Deleting ENI: $eni"
+              aws ec2 delete-network-interface --network-interface-id "$eni" --region $AWS_REGION 2>/dev/null || true
+            done
+          fi
+      
+      - name: Pre-cleanup - Delete Security Groups
+        run: |
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=project-bedrock-vpc" --query 'Vpcs[0].VpcId' --output text --region $AWS_REGION 2>/dev/null || echo "")
+          if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
+            for sg in $(aws ec2 describe-security-groups --region $AWS_REGION --filters "Name=vpc-id,Values=$VPC_ID" --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text 2>/dev/null); do
+              echo "Deleting SG: $sg"
+              aws ec2 delete-security-group --group-id "$sg" --region $AWS_REGION 2>/dev/null || true
+            done
+          fi
+      
+      - name: Pre-cleanup - Delete IAM Access Keys
+        run: |
+          for key in $(aws iam list-access-keys --user-name bedrock-dev-view --query 'AccessKeyMetadata[*].AccessKeyId' --output text --region $AWS_REGION 2>/dev/null); do
+            echo "Deleting IAM key: $key"
+            aws iam delete-access-key --user-name bedrock-dev-view --access-key-id "$key" --region $AWS_REGION 2>/dev/null || true
+          done
+          aws iam delete-login-profile --user-name bedrock-dev-view --region $AWS_REGION 2>/dev/null || true
+      
+      - name: Pre-cleanup - Empty S3 Buckets
+        run: |
+          BUCKET=$(aws s3 ls --region $AWS_REGION 2>/dev/null | grep bedrock-assets | awk '{print $3}')
+          if [ -n "$BUCKET" ]; then
+            echo "Emptying bucket: $BUCKET"
+            aws s3 rm "s3://$BUCKET" --recursive --region $AWS_REGION 2>/dev/null || true
+          fi
+      
+      - name: Pre-cleanup - Delete Secrets Manager Secret
+        run: |
+          aws secretsmanager delete-secret --secret-id project-bedrock-db-credentials --force-delete-without-recovery --region $AWS_REGION 2>/dev/null || true
+      
+      - name: Package Lambda function
+        run: |
+          cd lambda/bedrock-asset-processor
+          zip -r ../bedrock-asset-processor.zip index.py
+          cd ../..
+      
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+      
+      - name: Terraform Destroy
+        working-directory: terraform
+        run: terraform destroy -auto-approve -var="db_password=${{ secrets.DB_PASSWORD }}"
+        env:
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+      
+      - name: Final Cleanup - Force Delete VPC
+        if: always()
+        run: |
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=project-bedrock-vpc" --query 'Vpcs[0].VpcId' --output text --region $AWS_REGION 2>/dev/null || echo "")
+          if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
+            echo "Force deleting VPC: $VPC_ID"
+            aws ec2 delete-vpc --vpc-id "$VPC_ID" --region $AWS_REGION 2>/dev/null || true
+          fi
+          echo "✅ Cleanup complete."
+      
+      - name: Notify Destruction Complete
+        run: |
+          echo "## 🔥 Terraform Destroy Complete" >> $GITHUB_STEP_SUMMARY
+          echo "**All AWS resources have been destroyed.**" >> $GITHUB_STEP_SUMMARY
+
+  skip-confirmation:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm_destroy != 'DESTROY' }}
+    steps:
+      - name: Destruction Aborted
+        run: |
+          echo "## ⚠️ Terraform Destroy - ABORTED" >> $GITHUB_STEP_SUMMARY
+          echo "You must type **DESTROY** to confirm." >> $GITHUB_STEP_SUMMARY

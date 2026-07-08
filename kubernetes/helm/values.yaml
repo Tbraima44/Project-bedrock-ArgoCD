@@ -7,7 +7,7 @@ dynamodb:
   enabled: false
 
 # Number of replicas
-replicaCount: 2
+replicaCount: 1
 
 # Cart Service
 carts:

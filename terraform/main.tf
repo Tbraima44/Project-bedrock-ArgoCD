@@ -152,3 +152,4 @@ resource "aws_iam_openid_connect_provider" "eks" {
 
   tags = { Project = "karatu-2025-capstone" }
 }
+#trigger
