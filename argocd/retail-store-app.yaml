@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK-ARGOCD.git
     targetRevision: main
     path: retail-store-app-charts/cart/chart
     helm:
@@ -34,7 +34,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK-ARGOCD.git
     targetRevision: main
     path: retail-store-app-charts/catalog/chart
     helm:
@@ -58,7 +58,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK-ARGOCD.git
     targetRevision: main
     path: retail-store-app-charts/orders/chart
     helm:
@@ -82,7 +82,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK-ARGOCD.git
     targetRevision: main
     path: retail-store-app-charts/checkout/chart
     helm:
@@ -106,7 +106,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK-ARGOCD.git
     targetRevision: main
     path: retail-store-app-charts/ui/chart
   destination:
@@ -127,7 +127,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK-ARGOCD.git
     targetRevision: main
     path: kubernetes/retail-store
     directory:
@@ -150,7 +150,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK-ARGOCD.git
     targetRevision: main
     path: kubernetes/retail-store
     directory:
@@ -173,7 +173,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK-ARGOCD.git
     targetRevision: main
     path: kubernetes/retail-store
     directory:
@@ -196,7 +196,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK-ARGOCD.git
     targetRevision: main
     path: kubernetes/retail-store
     directory:
@@ -219,15 +219,13 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK-ARGOCD.git
     targetRevision: main
-    path: kubernetes/retail-store
-    directory:
-      include: 'ingress.yaml'
+    path: kubernetes/retail-store/ingress
   destination:
     server: https://kubernetes.default.svc
     namespace: retail-app
   syncPolicy:
     automated:
       prune: true
-      selfHeal: true      
+      selfHeal: true

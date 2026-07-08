@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK-ARGOCD.git
     targetRevision: main
     path: kubernetes/infrastructure/namespaces
     directory:
@@ -33,7 +33,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK.git
+    repoURL: https://github.com/Tbraima44/PROJECT-BEDROCK-ARGOCD.git
     targetRevision: main
     path: kubernetes/rbac
     directory:

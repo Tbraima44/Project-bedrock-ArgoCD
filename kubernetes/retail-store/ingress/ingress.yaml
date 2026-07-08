@@ -1,14 +1,12 @@
-# kubernetes/retail-store/argocd-ingress.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: argocd-ingress
-  namespace: argocd
+  name: retail-store-ingress
+  namespace: retail-app
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
-    alb.ingress.kubernetes.io/backend-protocol: HTTPS
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
 spec:
   ingressClassName: alb
   rules:
@@ -18,6 +16,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: argocd-server
+            name: retail-store-ui
             port:
-              number: 443
+              number: 80
