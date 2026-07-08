@@ -32,7 +32,23 @@ provider "helm" {
   }
 }
 
-# ... rest of your resources (Secrets Manager, IAM, OIDC, etc.)
+# Secrets Manager for database credentials
+resource "aws_secretsmanager_secret" "db_credentials" {
+  name                    = "project-bedrock-db-credentials"
+  recovery_window_in_days = 0
+  tags = { Project = "karatu-2025-capstone" }
+}
+
+resource "aws_secretsmanager_secret_version" "db_credentials" {
+  secret_id = aws_secretsmanager_secret.db_credentials.id
+  secret_string = jsonencode({
+    mysql_username      = var.db_username
+    mysql_password      = var.db_password
+    mysql_host          = aws_db_instance.mysql.endpoint
+    mysql_port          = "3306"
+    mysql_database      = "retaildb"
+  })
+}
 
 # ArgoCD installation via Helm
 resource "helm_release" "argocd" {
@@ -56,7 +72,7 @@ resource "helm_release" "argocd" {
   ]
 }
 
-# IAM role for LB Controller (IRSA)
+# IAM role for LB Controller (IRSA) - SINGLE definition
 resource "aws_iam_role" "load_balancer_controller" {
   name = "project-bedrock-lb-controller-role"
 
@@ -64,11 +80,11 @@ resource "aws_iam_role" "load_balancer_controller" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action = "sts:AssumeRoleWithWebIdentity"
         Effect = "Allow"
         Principal = {
-          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/oidc.eks.${var.aws_region}.amazonaws.com/id/${replace(aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")}"
+          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")}"
         }
+        Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
             "${replace(aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
@@ -149,7 +165,5 @@ resource "aws_iam_openid_connect_provider" "eks" {
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.eks.certificates[0].sha1_fingerprint]
   url             = aws_eks_cluster.main.identity[0].oidc[0].issuer
-
   tags = { Project = "karatu-2025-capstone" }
 }
-#trigger

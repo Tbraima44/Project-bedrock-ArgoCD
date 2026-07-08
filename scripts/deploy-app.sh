@@ -22,8 +22,7 @@ command -v openssl &> /dev/null || { echo "❌ openssl not found."; exit 1; }
 # ------------------------------------------------------------------
 echo "🔗 Updating kubeconfig..."
 aws eks update-kubeconfig --region "$REGION" --name "$CLUSTER_NAME"
-echo ""
-kubectl get nodes
+kubectl get nodes --no-headers | wc -l | xargs echo "  Nodes:"
 echo ""
 
 # ------------------------------------------------------------------
@@ -34,160 +33,133 @@ VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=project-bedrock-v
 echo "  VPC ID: $VPC_ID"
 
 # ------------------------------------------------------------------
-# 4. Install AWS Load Balancer Controller (COMPLETE)
+# 4. Create namespace
+# ------------------------------------------------------------------
+echo "📁 Creating namespace '$NAMESPACE'..."
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+# ------------------------------------------------------------------
+# 5. Apply IngressClass from Git (ArgoCD managed)
+# ------------------------------------------------------------------
+echo "🌐 Applying IngressClass..."
+kubectl apply -f kubernetes/retail-store/ingressclass.yaml
+
+# ------------------------------------------------------------------
+# 6. Install AWS Load Balancer Controller
 # ------------------------------------------------------------------
 echo "🌐 Installing AWS Load Balancer Controller..."
 
-# 4a. Apply CRDs
+# 6a. Apply CRDs
 echo "  Applying CRDs..."
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.7.0/config/crd/bases/elbv2.k8s.aws_targetgroupbindings.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.7.0/config/crd/bases/elbv2.k8s.aws_ingressclassparams.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.7.0/config/crd/bases/elbv2.k8s.aws_targetgroupbindings.yaml --validate=false
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.7.0/config/crd/bases/elbv2.k8s.aws_ingressclassparams.yaml --validate=false
 
-# 4b. Apply ClusterRole and ClusterRoleBinding from Git
+# 6b. Apply RBAC from Git (ArgoCD managed)
 echo "  Applying RBAC..."
 kubectl apply -f kubernetes/infrastructure/lb-controller/clusterrole.yaml
 kubectl apply -f kubernetes/infrastructure/lb-controller/clusterrolebinding.yaml
 
-# 4c. Generate TLS certificate
+# 6c. Generate TLS certificate
 echo "  Generating TLS certificate..."
-openssl req -x509 -newkey rsa:2048 -keyout /tmp/tls.key -out /tmp/tls.crt -days 365 -nodes -subj "/CN=aws-load-balancer-controller"
+openssl req -x509 -newkey rsa:2048 -keyout /tmp/tls.key -out /tmp/tls.crt -days 365 -nodes -subj "/CN=aws-load-balancer-controller" 2>/dev/null
 kubectl delete secret aws-load-balancer-tls -n kube-system --ignore-not-found=true
-kubectl create secret tls aws-load-balancer-tls --cert=/tmp/tls.crt --key=/tmp/tls.key -n kube-system
-rm /tmp/tls.key /tmp/tls.crt
+kubectl create secret tls aws-load-balancer-tls --cert=/tmp/tls.crt --key=/tmp/tls.key -n kube-system --dry-run=client -o yaml | kubectl apply -f -
+rm -f /tmp/tls.key /tmp/tls.crt
 
-# 4d. Create ServiceAccount with IRSA
-echo "  Creating ServiceAccount with IRSA..."
+# 6d. Create ServiceAccount with IRSA
+echo "  Creating ServiceAccount..."
 kubectl delete serviceaccount aws-load-balancer-controller -n kube-system --ignore-not-found=true
 kubectl create serviceaccount aws-load-balancer-controller -n kube-system --dry-run=client -o yaml | \
   kubectl annotate --local -f - "eks.amazonaws.com/role-arn=arn:aws:iam::${ACCOUNT_ID}:role/project-bedrock-lb-controller-role" --dry-run=client -o yaml | \
   kubectl apply -f -
 
-# 4e. Delete old replicasets
-echo "  Cleaning old replicasets..."
+# 6e. Clean old replicasets
 kubectl delete replicaset -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --ignore-not-found=true 2>/dev/null || true
 
-# 4f. Deploy controller with dynamic VPC ID
+# 6f. Deploy controller with dynamic VPC ID
 echo "  Deploying controller..."
 kubectl delete deployment aws-load-balancer-controller -n kube-system --ignore-not-found=true
 sed "s/--aws-vpc-id=.*/--aws-vpc-id=$VPC_ID/" kubernetes/infrastructure/lb-controller/deployment.yaml | kubectl apply -f -
 
-# 4g. Wait for controller
+# 6g. Wait for controller
 echo "  Waiting for LB Controller..."
-for i in $(seq 1 12); do
+for i in $(seq 1 20); do
   if kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --no-headers 2>/dev/null | grep -q Running; then
     echo "  ✅ LB Controller is running."
     break
   fi
-  if [ $i -eq 12 ]; then
-    echo "  ❌ LB Controller failed to start. Debug:"
+  if [ $i -eq 20 ]; then
+    echo "  ❌ LB Controller failed. Debug:"
     kubectl describe pod -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller | tail -20
-    kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --tail=20
     exit 1
   fi
-  sleep 10
+  sleep 5
 done
 
 # ------------------------------------------------------------------
-# 5. Add security group rule (ALB → Nodes)
+# 7. Security group: Allow traffic within VPC
 # ------------------------------------------------------------------
 echo "🔓 Configuring security group..."
 NODE_SG=$(aws ec2 describe-instances --filters "Name=tag:aws:eks:cluster-name,Values=$CLUSTER_NAME" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text --region "$REGION" 2>/dev/null || echo "")
 if [ -n "$NODE_SG" ] && [ "$NODE_SG" != "None" ]; then
-  aws ec2 authorize-security-group-ingress --group-id "$NODE_SG" --protocol tcp --port 8080 --cidr "10.0.0.0/16" --region "$REGION" 2>/dev/null || true
-  echo "  ✅ Security group rule added."
+  aws ec2 authorize-security-group-ingress --group-id "$NODE_SG" --protocol tcp --port 8080 --cidr 10.0.0.0/16 --region "$REGION" 2>/dev/null || true
+  echo "  ✅ Security group configured."
 fi
 
 # ------------------------------------------------------------------
-# 6. Developer access
+# 8. Developer access
 # ------------------------------------------------------------------
 echo "🔐 Configuring developer access..."
 kubectl apply -f kubernetes/rbac/dev-view-clusterrolebinding.yaml
 kubectl patch configmap aws-auth -n kube-system --type merge -p '{"data":{"mapUsers":"- userarn: arn:aws:iam::'$ACCOUNT_ID':user/bedrock-dev-view\n  username: bedrock-dev-view\n  groups:\n  - view"}}' 2>/dev/null || true
+echo "  ✅ Developer access configured."
 
 # ------------------------------------------------------------------
-# 7. Enable CloudWatch
+# 9. Enable CloudWatch
 # ------------------------------------------------------------------
-echo "📊 Enabling CloudWatch Observability..."
-aws eks create-addon --cluster-name "$CLUSTER_NAME" --addon-name amazon-cloudwatch-observability --region "$REGION" 2>/dev/null && echo "  ✅ CloudWatch add-on created." || echo "  ℹ️  Add-on may already exist."
+echo "📊 Enabling CloudWatch..."
+aws eks create-addon --cluster-name "$CLUSTER_NAME" --addon-name amazon-cloudwatch-observability --region "$REGION" 2>/dev/null && echo "  ✅ Created." || echo "  ℹ️  Already exists."
 
 # ------------------------------------------------------------------
-# 8. Update Lambda
+# 10. Update Lambda
 # ------------------------------------------------------------------
 echo "⚡ Updating Lambda..."
-cd lambda/bedrock-asset-processor && zip -r ../bedrock-asset-processor.zip index.py && cd ../..
-aws lambda update-function-code --function-name bedrock-asset-processor --zip-file fileb://lambda/bedrock-asset-processor.zip --region "$REGION" --no-cli-pager
+cd lambda/bedrock-asset-processor && zip -r ../bedrock-asset-processor.zip index.py -q && cd ../..
+aws lambda update-function-code --function-name bedrock-asset-processor --zip-file fileb://lambda/bedrock-asset-processor.zip --region "$REGION" --no-cli-pager 2>/dev/null
 echo "  ✅ Lambda updated."
 
 # ------------------------------------------------------------------
-# 9. Deploy application via ArgoCD
+# 11. Deploy application via ArgoCD
 # ------------------------------------------------------------------
 echo "📦 Deploying application via ArgoCD..."
 
-# Check if ArgoCD is installed
 if ! kubectl get namespace argocd &>/dev/null; then
-  echo "  ⚠️  ArgoCD not found. Install it via Terraform first."
-  echo "  Run: cd terraform && terraform apply"
+  echo "  ⚠️  ArgoCD not installed. Run Terraform first."
 else
-  # Delete old applications to force fresh sync
-  echo "  Refreshing ArgoCD applications..."
   kubectl delete application --all -n argocd --ignore-not-found=true 2>/dev/null || true
   sleep 5
-  
-  # Apply fresh
   kubectl apply -f argocd/infrastructure-app.yaml
   kubectl apply -f argocd/retail-store-app.yaml
   echo "  ✅ ArgoCD applications applied."
 fi
 
 # ------------------------------------------------------------------
-# 10. Wait for pods
+# 12. Wait for application pods
 # ------------------------------------------------------------------
 echo "⏳ Waiting for application pods..."
-sleep 30
-for i in $(seq 1 12); do
-  READY=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep -c Running || echo 0)
-  TOTAL=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l || echo 0)
-  echo "  Pods ready: $READY/$TOTAL"
+for i in $(seq 1 30); do
+  READY=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep -c "Running" || echo 0)
+  echo "  Pods ready: $READY"
   if [ "$READY" -ge 5 ] 2>/dev/null; then
     echo "  ✅ Application pods are running."
     break
   fi
-  sleep 15
+  sleep 10
 done
 
 # ------------------------------------------------------------------
-# 11. Apply Ingress and wait for ALB
+# 13. Wait for ALB
 # ------------------------------------------------------------------
-echo "🚪 Configuring Ingress..."
-kubectl delete ingress retail-store-ingress -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
-
-# Apply Ingress with correct service name
-kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: retail-store-ingress
-  namespace: $NAMESPACE
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
-    alb.ingress.kubernetes.io/healthcheck-path: /
-    alb.ingress.kubernetes.io/healthcheck-port: "8080"
-spec:
-  ingressClassName: alb
-  rules:
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: retail-store-ui
-            port:
-              number: 80
-EOF
-
 echo "⏳ Waiting for ALB..."
 for i in $(seq 1 30); do
   ALB_URL=$(kubectl get ingress retail-store-ingress -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
@@ -197,7 +169,7 @@ for i in $(seq 1 30); do
 done
 
 # ------------------------------------------------------------------
-# 12. Summary
+# 14. Summary
 # ------------------------------------------------------------------
 echo ""
 echo "================================================================"
@@ -208,11 +180,9 @@ if [ -n "$ALB_URL" ]; then
 else
   echo "⚠️  Check manually: kubectl get ingress -n $NAMESPACE"
 fi
-
 echo ""
 echo "📊 Pod Status:"
-kubectl get pods -n "$NAMESPACE" 2>/dev/null || echo "  (pods not yet ready)"
-
+kubectl get pods -n "$NAMESPACE" 2>/dev/null | head -10
 echo ""
 echo "🔍 ArgoCD Access:"
 echo "   kubectl port-forward svc/argocd-server -n argocd 8443:443"
