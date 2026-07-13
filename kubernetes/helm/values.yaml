@@ -14,7 +14,7 @@ dynamodb:
   enabled: false
 
 # Number of replicas per service
-replicaCount: 2
+replicaCount: 1
 
 # Database connection via ExternalName services
 datasource:
