@@ -13,16 +13,8 @@ spec:
     targetRevision: main
     path: retail-store-app-charts/cart/chart
     helm:
-      values: |
-        mysql:
-          enabled: false
-        postgresql:
-          enabled: false
-        dynamodb:
-          enabled: false
-        replicaCount: 1
-        datasource:
-          url: "jdbc:mysql://carts-db:3306/retaildb?useSSL=false&allowPublicKeyRetrieval=true"
+      valueFiles:
+        - ../../../kubernetes/helm/values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: retail-app
@@ -47,16 +39,8 @@ spec:
     targetRevision: main
     path: retail-store-app-charts/catalog/chart
     helm:
-      values: |
-        mysql:
-          enabled: false
-        postgresql:
-          enabled: false
-        dynamodb:
-          enabled: false
-        replicaCount: 1
-        datasource:
-          url: "jdbc:mysql://catalog-db:3306/retaildb?useSSL=false&allowPublicKeyRetrieval=true"
+      valueFiles:
+        - ../../../kubernetes/helm/values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: retail-app
@@ -79,16 +63,8 @@ spec:
     targetRevision: main
     path: retail-store-app-charts/orders/chart
     helm:
-      values: |
-        mysql:
-          enabled: false
-        postgresql:
-          enabled: false
-        dynamodb:
-          enabled: false
-        replicaCount: 1
-        datasource:
-          url: "jdbc:mysql://orders-db:3306/retaildb?useSSL=false&allowPublicKeyRetrieval=true"
+      valueFiles:
+        - ../../../kubernetes/helm/values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: retail-app
@@ -111,18 +87,8 @@ spec:
     targetRevision: main
     path: retail-store-app-charts/checkout/chart
     helm:
-      values: |
-        mysql:
-          enabled: false
-        postgresql:
-          enabled: false
-        dynamodb:
-          enabled: false
-        replicaCount: 1
-        checkout:
-          dynamodb:
-            tableName: "project-bedrock-retail-store"
-            region: "us-east-1"
+      valueFiles:
+        - ../../../kubernetes/helm/values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: retail-app

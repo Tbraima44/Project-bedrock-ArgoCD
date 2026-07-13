@@ -1,0 +1,21 @@
+# =============================================================================
+# Retail Store Sample App - Helm Values
+# =============================================================================
+# This file is committed to Git. ArgoCD reads it fresh on every sync.
+# Credentials are provided by Kubernetes Secrets at runtime.
+# =============================================================================
+
+# Disable all in-cluster databases
+mysql:
+  enabled: false
+postgresql:
+  enabled: false
+dynamodb:
+  enabled: false
+
+# Number of replicas per service
+replicaCount: 3
+
+# Database connection via ExternalName services
+datasource:
+  url: "jdbc:mysql://carts-db:3306/retaildb?useSSL=false&allowPublicKeyRetrieval=true"

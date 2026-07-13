@@ -21,4 +21,3 @@ __pycache__/
 *.swp
 test*.jpg
 grading.json
-kubernetes/helm/values.yaml
