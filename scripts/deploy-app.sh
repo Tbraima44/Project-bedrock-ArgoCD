@@ -50,15 +50,15 @@ else
   MYSQL_PASS="password"
 fi
 
-# ------------------------------------------------------------------
-# 5. Generate Helm values.yaml from template
-# ------------------------------------------------------------------
-echo "📝 Generating Helm values..."
-sed -e "s|MYSQL_HOST_PLACEHOLDER|$MYSQL_HOST|g" \
-    -e "s|MYSQL_USER_PLACEHOLDER|$MYSQL_USER|g" \
-    -e "s|MYSQL_PASS_PLACEHOLDER|$MYSQL_PASS|g" \
-    kubernetes/helm/values.yaml.tmpl > kubernetes/helm/values.yaml
-echo "  ✅ Helm values generated."
+# # ------------------------------------------------------------------
+# # 5. Generate Helm values.yaml from template
+# # ------------------------------------------------------------------
+# echo "📝 Generating Helm values..."
+# sed -e "s|MYSQL_HOST_PLACEHOLDER|$MYSQL_HOST|g" \
+#     -e "s|MYSQL_USER_PLACEHOLDER|$MYSQL_USER|g" \
+#     -e "s|MYSQL_PASS_PLACEHOLDER|$MYSQL_PASS|g" \
+#     kubernetes/helm/values.yaml.tmpl > kubernetes/helm/values.yaml
+# echo "  ✅ Helm values generated."
 
 # ------------------------------------------------------------------
 # 6. Create namespace

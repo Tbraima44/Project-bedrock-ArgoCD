@@ -13,8 +13,16 @@ spec:
     targetRevision: main
     path: retail-store-app-charts/cart/chart
     helm:
-      valueFiles:
-        - ../../../kubernetes/helm/values.yaml
+      values: |
+        mysql:
+          enabled: false
+        postgresql:
+          enabled: false
+        dynamodb:
+          enabled: false
+        replicaCount: 2
+        datasource:
+          url: "jdbc:mysql://carts-db:3306/retaildb?useSSL=false&allowPublicKeyRetrieval=true"
   destination:
     server: https://kubernetes.default.svc
     namespace: retail-app
@@ -39,8 +47,16 @@ spec:
     targetRevision: main
     path: retail-store-app-charts/catalog/chart
     helm:
-      valueFiles:
-        - ../../../kubernetes/helm/values.yaml
+      values: |
+        mysql:
+          enabled: false
+        postgresql:
+          enabled: false
+        dynamodb:
+          enabled: false
+        replicaCount: 2
+        datasource:
+          url: "jdbc:mysql://catalog-db:3306/retaildb?useSSL=false&allowPublicKeyRetrieval=true"
   destination:
     server: https://kubernetes.default.svc
     namespace: retail-app
@@ -63,8 +79,16 @@ spec:
     targetRevision: main
     path: retail-store-app-charts/orders/chart
     helm:
-      valueFiles:
-        - ../../../kubernetes/helm/values.yaml
+      values: |
+        mysql:
+          enabled: false
+        postgresql:
+          enabled: false
+        dynamodb:
+          enabled: false
+        replicaCount: 2
+        datasource:
+          url: "jdbc:mysql://orders-db:3306/retaildb?useSSL=false&allowPublicKeyRetrieval=true"
   destination:
     server: https://kubernetes.default.svc
     namespace: retail-app
@@ -87,8 +111,18 @@ spec:
     targetRevision: main
     path: retail-store-app-charts/checkout/chart
     helm:
-      valueFiles:
-        - ../../../kubernetes/helm/values.yaml
+      values: |
+        mysql:
+          enabled: false
+        postgresql:
+          enabled: false
+        dynamodb:
+          enabled: false
+        replicaCount: 2
+        checkout:
+          dynamodb:
+            tableName: "project-bedrock-retail-store"
+            region: "us-east-1"
   destination:
     server: https://kubernetes.default.svc
     namespace: retail-app
