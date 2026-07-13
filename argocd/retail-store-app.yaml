@@ -20,7 +20,7 @@ spec:
           enabled: false
         dynamodb:
           enabled: false
-        replicaCount: 2
+        replicaCount: 1
         datasource:
           url: "jdbc:mysql://carts-db:3306/retaildb?useSSL=false&allowPublicKeyRetrieval=true"
   destination:
@@ -54,7 +54,7 @@ spec:
           enabled: false
         dynamodb:
           enabled: false
-        replicaCount: 2
+        replicaCount: 1
         datasource:
           url: "jdbc:mysql://catalog-db:3306/retaildb?useSSL=false&allowPublicKeyRetrieval=true"
   destination:
@@ -86,7 +86,7 @@ spec:
           enabled: false
         dynamodb:
           enabled: false
-        replicaCount: 2
+        replicaCount: 1
         datasource:
           url: "jdbc:mysql://orders-db:3306/retaildb?useSSL=false&allowPublicKeyRetrieval=true"
   destination:
@@ -118,7 +118,7 @@ spec:
           enabled: false
         dynamodb:
           enabled: false
-        replicaCount: 2
+        replicaCount: 1
         checkout:
           dynamodb:
             tableName: "project-bedrock-retail-store"
